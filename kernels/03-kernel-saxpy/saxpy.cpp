@@ -2,7 +2,23 @@
 #include <stdio.h>
 #include <math.h>
 
-// TODO: add a device kernel that calculates y = a * x + y
+/* HIP error handling macro */
+#define HIP_ERRCHK(err) (hip_errchk(err, __FILE__, __LINE__ ))
+static inline void hip_errchk(hipError_t err, const char *file, int line) {
+  if (err != hipSuccess) {
+    printf("\n\n%s in %s at line %d\n", hipGetErrorString(err), file, line);
+    exit(EXIT_FAILURE);
+  }
+}
+
+__global__ void saxpy_(const int n, const float a, const float* const x, float* const y) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int stride = gridDim.x * blockDim.x;
+
+    for (int i = tid; i < n; i += stride) {
+        y[i] = a * x[i] + y[i];
+    }
+}
 
 int main(void)
 {
@@ -19,13 +35,21 @@ int main(void)
         y_ref[i] = a * x[i] + y[i];
     }
 
-    // TODO: allocate vectors x_ and y_ on the GPU
-    // TODO: copy initial values from CPU to GPU (x -> x_ and y -> y_)
+    HIP_ERRCHK(hipMalloc(&x_, sizeof(float) * n));
+    HIP_ERRCHK(hipMalloc(&y_, sizeof(float) * n));
 
-    // TODO: define grid dimensions
-    // TODO: launch the device kernel
+    HIP_ERRCHK(hipMemcpy(x_, x, sizeof(float) * n, hipMemcpyHostToDevice));
+    HIP_ERRCHK(hipMemcpy(y_, y, sizeof(float) * n, hipMemcpyHostToDevice));
 
-    // TODO: copy results back to CPU (y_ -> y)
+    dim3 blocks(32);
+    dim3 threads(256);
+
+    saxpy_<<<blocks, threads>>>(n, a, x_, y_);
+
+    HIP_ERRCHK(hipMemcpy(y, y_, sizeof(float) * n, hipMemcpyDeviceToHost));
+
+    HIP_ERRCHK(hipFree(x_));
+    HIP_ERRCHK(hipFree(y_));
 
     // confirm that results are correct
     float error = 0.0;
