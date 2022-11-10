@@ -53,7 +53,7 @@ void noRecurringAlloc(int nSteps, int size)
 
   int *d_A;
   // Allocate pinned device memory
-  #error allocate memory with hipMalloc for d_A of size
+  hipMalloc(&d_A, size);
 
   // Start timer and begin stepping loop
   clock_t tStart = clock();
@@ -62,13 +62,13 @@ void noRecurringAlloc(int nSteps, int size)
     // Launch GPU kernel
     hipKernel<<<gridsize, blocksize, 0, 0>>>(d_A, size);
     // Synchronization
-    #error synchronize the default stream here
+    hipStreamSynchronize(0);
   }
   // Check results and print timings
   checkTiming("noRecurringAlloc", (double)(clock() - tStart) / CLOCKS_PER_SEC);
 
   // Free allocation
-  #error free d_A allocation using hipFree
+  hipFree(d_A);
 }
 
 /* Do recurring allocation without memory pooling */
@@ -84,13 +84,13 @@ void recurringAllocNoMemPools(int nSteps, int size)
   {
     int *d_A;
     // Allocate pinned device memory
-    #error allocate memory with hipMalloc for d_A of size
+    hipMalloc(&d_A, size);
     // Launch GPU kernel
     hipKernel<<<gridsize, blocksize, 0, 0>>>(d_A, size);
     // Synchronization
-    #error synchronize the default stream here
+    hipStreamSynchronize(0);
     // Free allocation
-    #error free d_A allocation using hipFree
+    hipFree(d_A);
   }
   // Check results and print timings
   checkTiming("recurringAllocNoMemPools", (double)(clock() - tStart) / CLOCKS_PER_SEC);
@@ -113,14 +113,14 @@ void recurringAllocMemPoolNoSync(int nSteps, int size)
   {
     int *d_A;
     // Allocate pinned device memory
-    #error allocate memory with cudaMallocAsync for d_A of size in stream
+    cudaMallocAsync(&d_A, size, stream);
     // Launch GPU kernel
     hipKernel<<<gridsize, blocksize, 0, stream>>>(d_A, size);
     // Free allocation
-    #error free d_A allocation using cudaFreeAsync in stream
+    cudaFreeAsync(d_A, stream);
   }
   // Synchronization
-  #error synchronize stream here
+  hipStreamSynchronize(stream);
   // Check results and print timings
   checkTiming("recurringAllocMemPoolNoSync", (double)(clock() - tStart) / CLOCKS_PER_SEC);
 
@@ -145,13 +145,13 @@ void recurringAllocMemPoolSync(int nSteps, int size)
   {
     int *d_A;
     // Allocate pinned device memory
-    #error allocate memory with cudaMallocAsync for d_A of size in stream
+    cudaMallocAsync(&d_A, size, stream);
     // Launch GPU kernel
     hipKernel<<<gridsize, blocksize, 0, stream>>>(d_A, size);
     // Free allocation
-    #error free d_A allocation using cudaFreeAsync in stream
+    cudaFreeAsync(&d_A, stream);
     // Synchronization
-    #error synchronize the stream here
+    hipStreamSynchronize(stream);
   }
   // Check results and print timings
   checkTiming("recurringAllocMemPoolSync", (double)(clock() - tStart) / CLOCKS_PER_SEC);
