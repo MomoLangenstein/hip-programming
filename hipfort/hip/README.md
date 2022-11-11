@@ -25,3 +25,9 @@ Now the executable `a.out` can be executed as a normal gpu program.
 
 # Exercise
 Apply the above procedure to the `saxpy`  code in the present folder  and inspect the codes in the `rocm` repository folder `hipfort` containing the example (test) codes `.../hipfort/test/f2003`. See how the memory management (allocations and transfers) are done and how  various `hipxxx` libraries are called in `Fortran` programs.
+
+```
+hipcc "--gpu-architecture=sm_70" --x cu -c hipsaxpy.cpp
+gfortran -cpp -I/users/training141/hip-programming/hipfort/hip/hipfort/install/include/hipfort/nvptx "-DHIPFORT_ARCH=\"nvptx\"" -c main.f03 -o main.o
+hipcc -lgfortran main.o hipsaxpy.o "--gpu-architecture=sm_70" -I/users/training141/hip-programming/hipfort/hip/hipfort/install/include/hipfort/nvptx -L/users/training141/hip-programming/hipfort/hip/hipfort/install/lib/ -lhipfort-nvptx
+```
