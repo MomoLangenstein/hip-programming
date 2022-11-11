@@ -44,7 +44,9 @@ int main()
 
   // Define lambda1 function with 1 integer argument,
   // the lamba must call helloFromThread with that argument
-  # error put the first lambda funtion definition here
+  auto lambda1 = [=] __host__ __device__ (const int i) {
+    helloFromThread(i);
+  };
 
   // Run lambda1 on the CPU device
   cpuKernel(lambda1, loop_size);
@@ -58,7 +60,12 @@ int main()
 
   // Define lambda2 that captures pi (use [=] to capture by value), 
   // and prints out the results for i * pi from each thread
-  # error put the second lambda funtion definition here
+  auto lambda2 = [=] __host__ __device__ (const int i) {
+    printf("i * pi = %f\n", i * pi);
+  };
+
+  // Run lambda2 on the CPU device
+  cpuKernel(lambda2, loop_size);
 
   // Run lambda2 on the GPU device
   gpuKernel<<<gridsize, blocksize>>>(lambda2, loop_size);
