@@ -19,30 +19,29 @@ template <typename Lambda>
 __global__ void reduction_kernel(Lambda loop_body, const int loop_size, int *sum)
 {
   // Specialize BlockReduce for a 1D block of BLOCKSIZE threads of type int
-  #error add here hipcub typedef
-  
+  typedef hipcub::BlockReduce<int, BLOCKSIZE> BlockReduce;
+
   // Use shared memory for the hipcub library temporary storage
-  #error define the shared memory used by the hipcub library here
+  __shared__ typename BlockReduce::TempStorage temp_storage;
 
   // Get thread index
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Check loop limits
   if (idx < loop_size) {
-   
     // Local storage for the thread summation value
     int thread_sum = 0;
-  
+
     // Evaluate the loop body, the summation value is stored in thread_sum
     loop_body(idx, thread_sum);
-  
+
     // Compute the block-wide sum (aggregate) for the first thread of each block
-    int aggregate;
-    #error call the hipcub function to perform block-wide sum and store the result into 'aggregate'
+    int aggregate = BlockReduce(temp_storage).Sum(thread_sum);
 
     // The first thread of each block stores the block-wide aggregate to 'sum' using atomics
-    if(threadIdx.x == 0) 
-      #error use HIP native atomiAdd() function to sum the 'aggregate' of each block into 'sum'
+    if(threadIdx.x == 0) {
+      atomicAdd(sum, aggregate);
+    }
   }
 }
 
@@ -61,7 +60,7 @@ void parallel_reduce_gpu(const uint loop_size, Lambda loop_body, int *sum) {
   // Launch the reduction kernel
   reduction_kernel<<<gridsize, blocksize>>>(loop_body, loop_size, d_buf);
   hipStreamSynchronize(0);
-  
+
   // Copy reduction variable back to host from the GPU buffer
   hipMemcpy(sum, d_buf, sizeof(int), hipMemcpyDeviceToHost);
   hipFree(d_buf);
@@ -78,7 +77,7 @@ int main()
   int sum_gpu = 0;
   parallel_reduce_gpu(tn, [] __host__ __device__ (const int i, int &sum){
     int thread_idx = i;
-    sum += thread_idx; 
+    sum += thread_idx;
   }, &sum_gpu);
 
   // Calculate the triangular number on the CPU and store it in sum_cpu
