@@ -29,7 +29,7 @@ void ignoreTiming(int nSteps, int size)
 
   int *d_A;
   // Allocate pinned device memory
-  hipMalloc((void**)&d_A, size);
+  hipMalloc((void**)&d_A, sizeof(int) * size);
 
   // Start timer and begin stepping loop
   clock_t tStart = clock();
@@ -61,9 +61,9 @@ void noRecurringAlloc(int nSteps, int size)
   {    
     // Launch GPU kernel
     hipKernel<<<gridsize, blocksize, 0, 0>>>(d_A, size);
-    // Synchronization
-    hipStreamSynchronize(0);
   }
+  // Synchronization
+  hipStreamSynchronize(0);
   // Check results and print timings
   checkTiming("noRecurringAlloc", (double)(clock() - tStart) / CLOCKS_PER_SEC);
 
@@ -96,8 +96,8 @@ void recurringAllocNoMemPools(int nSteps, int size)
   checkTiming("recurringAllocNoMemPools", (double)(clock() - tStart) / CLOCKS_PER_SEC);
 }
 
-/* Run using memory pooling but no recurring syncs */
-void recurringAllocMemPoolNoSync(int nSteps, int size)
+/* Do recurring allocation with memory pooling */
+void recurringAllocMallocAsync(int nSteps, int size)
 {
   // Create HIP stream
   hipStream_t stream;
@@ -164,7 +164,7 @@ void recurringAllocMemPoolSync(int nSteps, int size)
 int main(int argc, char* argv[])
 {
   // Set the number of steps and 1D grid dimensions
-  int nSteps = 1e6, size = 1e6;
+  int nSteps = 1e4, size = 1e6;
   
   // Ignore first run, first kernel is slower
   ignoreTiming(nSteps, size);
@@ -172,6 +172,5 @@ int main(int argc, char* argv[])
   // Run with different memory allocatins strategies
   noRecurringAlloc(nSteps, size);
   recurringAllocNoMemPools(nSteps, size);
-  recurringAllocMemPoolNoSync(nSteps, size);
-  recurringAllocMemPoolSync(nSteps, size);
+  recurringAllocMallocAsync(nSteps, size);
 }
