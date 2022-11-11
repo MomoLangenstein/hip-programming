@@ -32,7 +32,14 @@ int main(int argc, char *argv[])
     hipStream_t strm[2];
     Decomp dec[2];
 
-    // TODO: Check that we have two HIP devices available
+    // Check that we have two HIP devices available
+    hipGetDeviceCount(&devicecount);
+    if(devicecount < 2) {
+        printf("Need at least two GPUs!\n");
+        exit(EXIT_FAILURE);
+    } else {
+        printf("Found %d GPU devices, using GPUs 0 and 1!\n", devicecount);
+    }
 
     // Create timing events
     hipSetDevice(0);
@@ -40,8 +47,11 @@ int main(int argc, char *argv[])
     hipEventCreate(&stop);
 
     // Allocate host memory
-    // TODO: Allocate enough pinned host memory for hA, hB, and hC
-    //       to store N doubles each
+    // Allocate enough pinned host memory for hA, hB, and hC to store
+    // N doubles each
+    hipMallocHost((void**)&hA, sizeof(double) * N);
+    hipMallocHost((void**)&hB, sizeof(double) * N);
+    hipMallocHost((void**)&hC, sizeof(double) * N);
 
     // Initialize host memory
     for(int i = 0; i < N; ++i) {
@@ -57,9 +67,16 @@ int main(int argc, char *argv[])
 
     // Allocate memory for the devices and per device streams
     for (int i = 0; i < 2; ++i) {
-        // TODO: Allocate enough device memory for dA[i], dB[i], dC[i]
-        //       to store dec[i].len doubles
-        // TODO: Create a stream for each device
+        // Allocate enough device memory for dA[i], dB[i], dC[i]
+        // to store dec[i].len doubles
+
+        hipSetDevice(i);
+        hipMalloc(&dA[i], sizeof(double) * dec[i].len);
+        hipMalloc(&dB[i], sizeof(double) * dec[i].len);
+        hipMalloc(&dC[i], sizeof(double) * dec[i].len);
+
+        // Create a stream for each device
+        hipStreamCreate(&strm[i]);
     }
 
     // Start timing
@@ -72,23 +89,38 @@ int main(int argc, char *argv[])
        the execution is serialized because the memory copies block the
        execution of the host process. */
     for (int i = 0; i < 2; ++i) {
-        // TODO: Set active device
-        // TODO: Copy data from host to device asynchronously (hA[dec[i].start] -> dA[i], hB[dec[i].start] -> dB[i])
-        // TODO: Launch 'vector_add()' kernel to calculate dC = dA + dB
-        // TODO: Copy data from device to host (dC[i] -> hC[dec[0].start])
+        // Set active device
+        hipSetDevice(i);
+        // Copy data from host to device asynchronously (hA[dec[i].start] -> dA[i], hB[dec[i].start] -> dB[i])
+        hipMemcpyAsync(dA[i], &hA[dec[i].start], sizeof(double) * dec[i].len, hipMemcpyHostToDevice, strm[i]);
+        hipMemcpyAsync(dB[i], &hB[dec[i].start], sizeof(double) * dec[i].len, hipMemcpyHostToDevice, strm[i]);
+        // Launch 'vector_add()' kernel to calculate dC = dA + dB
+        vector_add<<<(dec[i].len + ThreadsInBlock - 1) / ThreadsInBlock, ThreadsInBlock, 0, strm[i]>>>(dC[i], dA[i], dB[i], N);
+        // Copy data from device to host (dC[i] -> hC[dec[0].start])
+        hipMemcpyAsync(&hC[dec[i].start], dC[i], sizeof(double) * dec[i].len, hipMemcpyDeviceToHost, strm[i]);
     }
 
     // Synchronize and destroy the streams
     for (int i = 0; i < 2; ++i) {
-        // TODO: Add synchronization calls and destroy streams
+        // Add synchronization calls and destroy streams
+        hipSetDevice(i);
+        hipStreamSynchronize(strm[i]);
+        hipStreamDestroy(strm[i]);
     }
 
-    // Stop timing
-    // TODO: Add here the timing event stop calls
+    // Stop timing with the timing event stop calls
+    hipSetDevice(0);
+    hipEventRecord(stop);
+    hipStreamSynchronize(0);
 
     // Free device memory
     for (int i = 0; i < 2; ++i) {
-        // TODO: Deallocate device memory
+        hipSetDevice(i);
+
+        // Deallocate device memory
+        hipFree(dA[i]);
+        hipFree(dB[i]);
+        hipFree(dC[i]);
     }
 
     // Check results
